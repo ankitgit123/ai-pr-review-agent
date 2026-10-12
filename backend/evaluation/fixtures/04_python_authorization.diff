@@ -1,0 +1,8 @@
+
+diff --git a/backend/app/api/routes/documents.py b/backend/app/api/routes/documents.py
+--- a/backend/app/api/routes/documents.py
++++ b/backend/app/api/routes/documents.py
+@@ -1,5 +1,5 @@
+ def get_document(document_id: int, current_user):
+-    return repository.get_for_user(document_id, current_user.id)
++    return repository.get_by_id(document_id)

@@ -1,0 +1,8 @@
+
+diff --git a/backend/app/repositories/orders.py b/backend/app/repositories/orders.py
+--- a/backend/app/repositories/orders.py
++++ b/backend/app/repositories/orders.py
+@@ -1,5 +1,5 @@
+ def get_orders(connection, user_id):
+-    return connection.execute("SELECT * FROM orders WHERE user_id = %s", (user_id,))
++    return connection.execute("SELECT * FROM orders")

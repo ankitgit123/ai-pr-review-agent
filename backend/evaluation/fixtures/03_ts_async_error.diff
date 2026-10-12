@@ -1,0 +1,9 @@
+
+diff --git a/frontend/src/api.ts b/frontend/src/api.ts
+--- a/frontend/src/api.ts
++++ b/frontend/src/api.ts
+@@ -1,5 +1,5 @@
+ export async function loadProfile(userId: string) {
+-  return fetchProfile(userId).catch(() => null);
++  return fetchProfile(userId);
+ }

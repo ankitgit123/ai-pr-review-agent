@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pymysql
+alembic
+httpx
+langchain-groq
+pytest
+fastembed
+chromadb

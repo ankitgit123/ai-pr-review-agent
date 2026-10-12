@@ -1,0 +1,55 @@
+
+{
+  "dataset_version": 1,
+  "description": "Synthetic pull-request diff evaluation set for the AI PR Review Agent.",
+  "cases": [
+    {
+      "id": "css_layering",
+      "fixture": "fixtures/01_css_layering.diff",
+      "language": "css",
+      "expected": "no_confirmed_bug",
+      "expected_added_lines": [64],
+      "notes": "A hardcoded z-index change alone does not establish a defect. An evidence-supported policy concern may remain uncertain."
+    },
+    {
+      "id": "js_null_dereference",
+      "fixture": "fixtures/02_js_null_dereference.diff",
+      "language": "javascript",
+      "expected": "bug",
+      "expected_added_lines": [2],
+      "notes": "The function can throw when user is null or undefined."
+    },
+    {
+      "id": "ts_async_error",
+      "fixture": "fixtures/03_ts_async_error.diff",
+      "language": "typescript",
+      "expected": "conditional_regression",
+      "expected_added_lines": [2],
+      "notes": "The removed catch handler is a regression only if the caller contract requires rejection to be converted to null or otherwise handled."
+    },
+    {
+      "id": "python_authorization",
+      "fixture": "fixtures/04_python_authorization.diff",
+      "language": "python",
+      "expected": "potential_security_bug",
+      "expected_added_lines": [2],
+      "notes": "Potential authorization bypass; repository method behavior and upstream access checks must be considered."
+    },
+    {
+      "id": "sql_tenant_isolation",
+      "fixture": "fixtures/05_sql_tenant_isolation.diff",
+      "language": "sql",
+      "expected": "bug",
+      "expected_added_lines": [2],
+      "notes": "The query removes the user_id filter, potentially exposing records across users."
+    },
+    {
+      "id": "harmless_refactor",
+      "fixture": "fixtures/06_harmless_refactor.diff",
+      "language": "javascript",
+      "expected": "no_findings",
+      "expected_added_lines": [2, 3],
+      "notes": "The refactor preserves the original arithmetic."
+    }
+  ]
+}
