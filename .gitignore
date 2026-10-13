@@ -37,3 +37,6 @@ data/
 
 # Test and coverage reports
 coverage/
+
+# Generated AI evaluation reports
+backend/evaluation/reports/

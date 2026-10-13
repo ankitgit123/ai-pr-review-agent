@@ -178,3 +178,63 @@ def test_github_integration_uses_only_read_operations(workflow):
             pull_request_number=1,
         ),
     ]
+
+
+def test_empty_policy_evidence_is_passed_to_llm(workflow):
+    """No retrieval results must remain an explicit empty evidence list."""
+
+    workflow.retrieval_service.retrieve.return_value = []
+
+    workflow.run("example", "repo", 1)
+
+    kwargs = workflow.llm_review_service.review.call_args.kwargs
+    assert kwargs["policy_evidence"] == []
+
+
+def test_invalid_llm_finding_is_reported_in_validation_results(workflow):
+    """An unsupported finding must be marked invalid, not silently trusted."""
+
+    from app.services.llm_review_service import LLMReviewFinding
+    from app.services.finding_validation_service import (
+        FindingValidationResult,
+    )
+
+    finding = LLMReviewFinding(
+        rule_id="TEST001",
+        severity="high",
+        category="security",
+        message="Potential authorization issue.",
+        file_path="frontend/src/other.py",
+        line_number=99,
+        evidence="unauthorized_access()",
+        evidence_explanation="The access check may be missing.",
+        policy_sources=[],
+        classification="uncertain",
+    )
+
+    workflow.llm_review_service.review.return_value = LLMReviewResult(
+        findings=[finding],
+        summary="One finding requires verification.",
+    )
+
+    workflow.finding_validation_service = Mock()
+    workflow.finding_validation_service.validate.return_value = (
+        FindingValidationResult(
+            valid=False,
+            errors=("File is not part of the diff.",),
+        )
+    )
+
+    result = workflow.run("example", "repo", 1)
+
+    assert len(result.finding_validations) == 1
+    assert result.finding_validations[0].valid is False
+    assert "File is not part of the diff." in (
+        result.finding_validations[0].errors
+    )
+
+    # The model output is preserved separately from validation status.
+    assert result.llm_review.findings == [finding]
+    assert result.finding_validations[0].valid is False
+    assert result.finding_validations[0].errors
+

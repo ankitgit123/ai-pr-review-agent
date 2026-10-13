@@ -1,6 +1,7 @@
-
+from unittest.mock import Mock, call, patch
+from groq import BadRequestError
+from langchain_core.messages import HumanMessage, SystemMessage
 import pytest
-
 from app.schemas.review_input import PullRequestData, ReviewInput
 from app.services.llm_review_service import (
     LLMReviewFinding,
@@ -163,3 +164,101 @@ def test_accepts_empty_findings():
     )
 
     assert result.findings == []
+
+
+def test_rejects_non_structured_model_response():
+    service = make_service(
+        LLMReviewResult(findings=[], summary="No issues.")
+    )
+    service.model = Mock()
+    service.model.invoke.return_value = {"findings": [], "summary": "No issues."}
+
+    with pytest.raises(
+        RuntimeError,
+        match="expected structured result",
+    ):
+        service.review(make_review_input(), policy_evidence=[])
+
+
+def test_missing_groq_api_key_fails_clearly(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+
+    with pytest.raises(
+        RuntimeError,
+        match="GROQ_API_KEY is not configured",
+    ):
+        LLMReviewService()
+
+
+def test_non_json_validation_bad_request_is_not_retried():
+    service = make_service(
+        LLMReviewResult(findings=[], summary="No issues.")
+    )
+    service.model = Mock()
+
+    error = BadRequestError(
+        message="Invalid request",
+        response=Mock(status_code=400, request=Mock()),
+        body={"error": {"code": "invalid_request"}},
+    )
+    service.model.invoke.side_effect = error
+
+    with pytest.raises(BadRequestError):
+        service.review(make_review_input(), policy_evidence=[])
+
+    service.model.invoke.assert_called_once()
+
+
+def test_json_validation_error_uses_one_fallback_retry():
+    service = make_service(
+        LLMReviewResult(findings=[], summary="No issues.")
+    )
+    service.model = Mock()
+
+    error = BadRequestError(
+        message="Structured output validation failed",
+        response=Mock(status_code=400, request=Mock()),
+        body={"error": {"code": "json_validate_failed"}},
+    )
+    service.model.invoke.side_effect = [
+        error,
+        LLMReviewResult(findings=[], summary="No supported issues."),
+    ]
+
+    result = service.review(make_review_input(), policy_evidence=[])
+
+    assert result.summary == "No supported issues."
+    assert service.model.invoke.call_count == 2
+
+    first_messages = service.model.invoke.call_args_list[0].args[0]
+    fallback_messages = service.model.invoke.call_args_list[1].args[0]
+
+    assert any(isinstance(message, SystemMessage) for message in first_messages)
+    assert isinstance(fallback_messages[0], SystemMessage)
+    assert isinstance(fallback_messages[1], HumanMessage)
+
+
+def test_fallback_failure_raises_clear_runtime_error():
+    service = make_service(
+        LLMReviewResult(findings=[], summary="No issues.")
+    )
+    service.model = Mock()
+
+    error = BadRequestError(
+        message="Structured output validation failed",
+        response=Mock(status_code=400, request=Mock()),
+        body={"error": {"code": "json_validate_failed"}},
+    )
+    service.model.invoke.side_effect = [
+        error,
+        RuntimeError("simulated provider failure"),
+    ]
+
+    with pytest.raises(
+        RuntimeError,
+        match="failed after one fallback retry",
+    ):
+        service.review(make_review_input(), policy_evidence=[])
+
+    assert service.model.invoke.call_count == 2
+

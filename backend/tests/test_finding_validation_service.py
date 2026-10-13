@@ -184,3 +184,44 @@ index 291edd5..2fae127 100644
         "line number" in error
         for error in result.errors
     )
+
+
+def test_ts_async_fixture_uses_actual_added_line_number():
+    from pathlib import Path
+
+    fixture_path = (
+        Path(__file__).resolve().parents[1]
+        / "evaluation"
+        / "fixtures"
+        / "03_ts_async_error.diff"
+    )
+    diff = fixture_path.read_text(encoding="utf-8")
+    service = FindingValidationService()
+
+    correct_finding = make_finding(
+        file_path="frontend/src/api.ts",
+        line_number=2,
+        evidence="return fetchProfile(userId);",
+    )
+    incorrect_finding = make_finding(
+        file_path="frontend/src/api.ts",
+        line_number=3,
+        evidence="return fetchProfile(userId);",
+    )
+
+    correct_result = service.validate(
+        finding=correct_finding,
+        diff=diff,
+    )
+    incorrect_result = service.validate(
+        finding=incorrect_finding,
+        diff=diff,
+    )
+
+    assert correct_result.valid is True
+    assert incorrect_result.valid is False
+    assert any(
+        "line number is not an added line" in error
+        for error in incorrect_result.errors
+    )
+

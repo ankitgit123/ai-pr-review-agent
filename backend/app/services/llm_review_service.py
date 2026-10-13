@@ -129,6 +129,41 @@ class LLMReviewService:
 
         return response
 
+    
+    @staticmethod
+    def _deduplicate_findings(
+        result: LLMReviewResult,
+    ) -> LLMReviewResult:
+        """Remove exact duplicate findings while preserving their order."""
+
+        unique_findings: list[LLMReviewFinding] = []
+        seen: set[tuple] = set()
+
+        for finding in result.findings:
+            key = (
+                finding.rule_id,
+                finding.severity,
+                finding.category,
+                finding.classification,
+                finding.message,
+                finding.file_path,
+                finding.line_number,
+                finding.evidence,
+                finding.evidence_explanation,
+                tuple(
+                    (source.source, source.section)
+                    for source in finding.policy_sources
+                ),
+            )
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+            unique_findings.append(finding)
+
+        return result.model_copy(update={"findings": unique_findings})
+
     def review(
         self,
         review_input: ReviewInput,
@@ -157,13 +192,21 @@ Rules:
    context lines before the addition places that addition on line 64.
 7. Use "evidence_backed" only for concrete concerns supported by the code.
    Use "uncertain" when verification is still needed.
-8. A policy deviation alone is not necessarily a bug.
-9. Cite only retrieved policy sources and full section paths supplied
+8. A policy deviation alone is not necessarily a bug. Clearly
+   distinguish a policy concern from a confirmed functional defect.
+9. Do not claim that a vulnerability is exploitable, that all users
+   can access data, or that a security boundary is completely bypassed
+   unless the supplied diff and evidence establish that conclusion.
+   Describe the demonstrated risk and state what remains unverified.
+10. Use severity to describe the potential impact of the issue, not
+    your confidence that the issue exists. Do not use critical severity
+    unless the demonstrated impact justifies it.
+11. Cite only retrieved policy sources and full section paths supplied
    in the evidence. Copy their identifiers exactly.
-10. Use an empty policy_sources list if no retrieved policy supports
+12. Use an empty policy_sources list if no retrieved policy supports
     the finding.
-11. Use severity carefully and explain uncertainty accurately.
-12. Return only data conforming to the required structured schema.
+13. Use severity carefully and explain uncertainty accurately.
+14. Return only data conforming to the required structured schema.
 """
 
         if policy_evidence:
@@ -252,4 +295,4 @@ Requirements:
                         "present in the retrieved evidence."
                     )
 
-        return result
+        return self._deduplicate_findings(result)
